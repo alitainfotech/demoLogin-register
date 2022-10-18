@@ -30,15 +30,14 @@ const passwordHash = (password) => {
     });
   });
 };
-const loginPasswordHash = (password) => {
-  return new Promise((resolve, reject) => {
-    bcrypt.hash(password, parseInt(saltRounds), function (err, hash) {
-      if (err) {
-        return reject(err);
+const loginPasswordHash = (password, hash) => {
+  return new Promise((resolve) => {
+    bcrypt.compare(password, hash).then((isValid) => {
+      if (isValid) {
+        return resolve(isValid);
       }
-      return resolve(hash);
+      return resolve(isValid);
     });
-    bcrypt.compare(password, hash);
   });
 };
 
@@ -46,27 +45,38 @@ const loginPasswordHash = (password) => {
 const login = async (req, res) => {
   try {
     let { email, password } = req.body;
-    console.log("req.body", req.body);
     const userObj = await Users.findOne({
       where: {
         email: email,
-        password: await loginPasswordHash(password),
         status: STATUS_DEFAULT,
         is_deleted: FALSE,
       },
-      attributes: ["id", "email"],
+      attributes: ["id", "email", "password"],
     });
-    console.log("userobj", userObj);
     if (userObj) {
-      const token = authService.generateToken(userObj);
-      await addToken(token, userObj.id);
-      const responsePayload = {
-        status: RESPONSE_PAYLOAD_STATUS_SUCCESS,
-        message: AUTH_MESSAGES.LOGIN_SUCCESS,
-        data: { token, userObj },
-        error: NULL,
-      };
-      return res.status(RESPONSE_STATUS_CODE_OK).json(responsePayload);
+      const userHash = userObj.password;
+      const isPasswordValid = await loginPasswordHash(password, userHash);
+      if (isPasswordValid) {
+        const userJsonObject = userObj.toJSON();
+        delete userJsonObject.password;
+        const token = authService.generateToken(userJsonObject);
+        await addToken(token, userObj.id);
+        const responsePayload = {
+          status: RESPONSE_PAYLOAD_STATUS_SUCCESS,
+          message: AUTH_MESSAGES.LOGIN_SUCCESS,
+          data: { token, userObj: userJsonObject },
+          error: NULL,
+        };
+        return res.status(RESPONSE_STATUS_CODE_OK).json(responsePayload);
+      } else {
+        const responsePayload = {
+          status: RESPONSE_PAYLOAD_STATUS_ERROR,
+          message: AUTH_MESSAGES.LOGIN_FAILED,
+          data: NULL,
+          error: AUTH_MESSAGES.INVALID_CREDENTIALS,
+        };
+        return res.status(RESPONSE_STATUS_CODE_OK).json(responsePayload);
+      }
     } else {
       const responsePayload = {
         status: RESPONSE_PAYLOAD_STATUS_ERROR,
@@ -100,11 +110,10 @@ const register = async (req, res) => {
       const userData = {
         id: user.id,
         email: user.email,
-        password: user.password,
       };
       const responsePayload = {
         status: RESPONSE_PAYLOAD_STATUS_SUCCESS,
-        message: NULL,
+        message: AUTH_MESSAGES.REGISTER_SUCCESS,
         data: userData,
         error: NULL,
       };
@@ -114,12 +123,11 @@ const register = async (req, res) => {
         status: RESPONSE_PAYLOAD_STATUS_ERROR,
         message: NULL,
         data: NULL,
-        error: RESPONSE_STATUS_MESSAGE_NOT_FOUND,
+        error: AUTH_MESSAGES.REGISTER_FAILED,
       };
       return res.status(RESPONSE_STATUS_CODE_OK).json(responsePayload);
     }
   } catch (err) {
-    console.log("er", err);
     const responsePayload = {
       status: RESPONSE_PAYLOAD_STATUS_ERROR,
       message: NULL,

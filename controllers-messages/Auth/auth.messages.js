@@ -13,6 +13,9 @@ const AUTH_MESSAGES = {
 
   PASSWORD_ERROR_MISSING: "Password is missing",
   PASSWORD_ERROR_EMPTY: "Password is empty",
+
+  REGISTER_SUCCESS: "Registered successfully!",
+  REGISTER_FAILED: "Registered failed!"
 };
 
 module.exports = AUTH_MESSAGES;

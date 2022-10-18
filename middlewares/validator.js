@@ -20,7 +20,7 @@ const validateApi = (req, res, next) => {
     status: RESPONSE_PAYLOAD_STATUS_ERROR,
     message: NULL,
     data: NULL,
-    error: extractedErrors,
+    errors: extractedErrors,
   };
 
   return res
